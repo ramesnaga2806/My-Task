@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SSWR Task Manager</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    h2 { margin-bottom: 10px; }
+    form input, form textarea, form select, form button {
+      margin: 5px 0; display: block; width: 100%; max-width: 400px; padding: 8px;
+    }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+    table, th, td { border: 1px solid #ccc; }
+    th, td { padding: 8px; text-align: left; }
+    button.complete-btn { background-color: #28a745; color: #fff; border: none; padding: 5px 10px; cursor: pointer; }
+    button.download-btn { margin-top: 10px; padding: 8px 12px; }
+  </style>
+</head>
+<body>
+  <h2>SSWR Task Manager</h2>
+  <p><strong>Note:</strong> Tasks are saved locally in this table. Download CSV if needed.</p>
+
+  <!-- Department Filter -->
+  <label for="departmentFilter"><strong>View Department:</strong></label>
+  <select id="departmentFilter">
+    <option value="All">All</option>
+    <option value="Inbound">Inbound</option>
+    <option value="Outbound">Outbound</option>
+    <option value="Wave Planner">Wave Planner</option>
+    <option value="Inventory">Inventory</option>
+    <option value="Rework">Rework</option>
+    <option value="Return">Return</option>
+    <option value="PTC">PTC</option>
+    <option value="PTL">PTL</option>
+    <option value="Admin">Admin</option>
+  </select>
+
+  <!-- Add Task Form -->
+  <form id="taskForm">
+    <input type="text" id="title" placeholder="Title" required />
+    <input type="text" id="emailSubject" placeholder="Email Subject (Optional)" />
+    <input type="text" id="requestBy" placeholder="Request By" required />
+    <textarea id="remark" placeholder="Remark"></textarea>
+    <select id="department" required>
+      <option value="">Select Department</option>
+      <option value="Inbound">Inbound</option>
+      <option value="Outbound">Outbound</option>
+      <option value="Wave Planner">Wave Planner</option>
+      <option value="Inventory">Inventory</option>
+      <option value="Rework">Rework</option>
+      <option value="Return">Return</option>
+      <option value="PTC">PTC</option>
+      <option value="PTL">PTL</option>
+      <option value="Admin">Admin</option>
+    </select>
+    <button type="submit">Add Task</button>
+  </form>
+
+  <!-- Task Table -->
+  <table id="taskTable">
+    <thead>
+      <tr>
+        <th>Department</th>
+        <th>Title</th>
+        <th>Email Subject</th>
+        <th>Request By</th>
+        <th>Remark</th>
+        <th>Created Date & Time</th>
+        <th>Incharge Person</th>
+        <th>Status of Progress</th>
+        <th>Update Remark</th>
+        <th>Current Date & Time</th>
+        <th>Complete Task</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <button class="download-btn" onclick="downloadTasks()">Download Tasks (CSV)</button>
+
+  <script>
+    const taskForm = document.getElementById("taskForm");
+    const taskTable = document.getElementById("taskTable").querySelector("tbody");
+    const departmentFilter = document.getElementById("departmentFilter");
+
+    function getCurrentDateTime() {
+      return new Date().toLocaleString();
+    }
+
+    taskForm.addEventListener("submit", function(e) {
+      e.preventDefault();
+
+      const title = document.getElementById("title").value;
+      const emailSubject = document.getElementById("emailSubject").value;
+      const requestBy = document.getElementById("requestBy").value;
+      const remark = document.getElementById("remark").value;
+      const department = document.getElementById("department").value;
+      const createdDate = getCurrentDateTime();
+
+      const row = taskTable.insertRow();
+      row.setAttribute("data-department", department);
+
+      row.insertCell(0).innerText = department;
+      row.insertCell(1).innerText = title;
+      row.insertCell(2).innerText = emailSubject;
+      row.insertCell(3).innerText = requestBy;
+      row.insertCell(4).innerText = remark;
+      row.insertCell(5).innerText = createdDate;
+      row.insertCell(6).contentEditable = "true";
+
+      const statusCell = row.insertCell(7);
+      const select = document.createElement("select");
+      ["Open", "Progress", "Complete"].forEach(optText => {
+        const opt = document.createElement("option");
+        opt.value = optText;
+        opt.textContent = optText;
+        select.appendChild(opt);
+      });
+      select.value = "Open";
+      statusCell.appendChild(select);
+
+      row.insertCell(8).contentEditable = "true";
+
+      const currentTimeCell = row.insertCell(9);
+      currentTimeCell.innerText = getCurrentDateTime();
+
+      select.addEventListener("change", () => {
+        currentTimeCell.innerText = getCurrentDateTime();
+      });
+      row.cells[8].addEventListener("input", () => {
+        currentTimeCell.innerText = getCurrentDateTime();
+      });
+      row.cells[6].addEventListener("input", () => {
+        currentTimeCell.innerText = getCurrentDateTime();
+      });
+
+      const completeCell = row.insertCell(10);
+      const completeBtn = document.createElement("button");
+      completeBtn.textContent = "Complete Task";
+      completeBtn.className = "complete-btn";
+      completeBtn.onclick = function() {
+        select.value = "Complete";
+        currentTimeCell.innerText = getCurrentDateTime();
+        row.remove();
+        downloadTasks();
+      };
+      completeCell.appendChild(completeBtn);
+
+      taskForm.reset();
+      filterTasks();
+    });
+
+    departmentFilter.addEventListener("change", filterTasks);
+
+    function filterTasks() {
+      const selectedDept = departmentFilter.value;
+      for (let row of taskTable.rows) {
+        const dept = row.getAttribute("data-department");
+        row.style.display = (selectedDept === "All" || dept === selectedDept) ? "" : "none";
+      }
+    }
+
+    function downloadTasks() {
+      let csv = "Department,Title,Email Subject,Request By,Remark,Created Date & Time,Incharge Person,Status of Progress,Update Remark,Current Date & Time\n";
+      for (let row of taskTable.rows) {
+        let cols = Array.from(row.cells).slice(0, 10).map(cell => {
+          if (cell.querySelector("select")) {
+            return '"' + cell.querySelector("select").value + '"';
+          } else {
+            return '"' + cell.innerText.replace(/"/g, '""') + '"';
+          }
+        });
+        csv += cols.join(",") + "\n";
+      }
+      const blob = new Blob([csv], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "tasks.csv";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
